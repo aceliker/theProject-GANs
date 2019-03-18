@@ -1,0 +1,99 @@
+#= PSEUDOCODE FOR GAN ALGO
+dataset = reshape(load_data("datapath"))
+
+
+# training loop
+
+for ep in epochs
+
+    for batch in minibatch(shuffle(dataset))
+        noise = make_noise(noise_size)
+
+        # session disc
+        
+        update!(discriminator, loss(discriminator(generator(noise)),0,lr))
+        update!(discriminator, loss(discriminator(batch),1,lr))
+
+        # session generator
+
+        update!(generator, loss(discriminator(generator(noise)),0,lr))
+
+    end
+
+output = write_to_file("out.jpg",generator(make_noise(noise_size)))
+
+end
+=#
+
+import Pkg
+Pkg.add("Knet")
+Pkg.add("GZip")
+Pkg.add("ImageMagick")
+using Knet
+using Images
+using ImageMagick
+using Base
+using AutoGrad
+using GZip
+
+#Create the training function
+function train(dataset, noise_size, gen_size, alpha, disc_size shuffle=false, bs=16, num_epoch, lr, beta1, beta2, eps)
+    
+    w_gen = wgen_0(noise_size, size(dataset[1]), gen_size)
+    w_disc = wdisc_0(size(dataset[1]), disc_size)
+    
+    for ep in num_epoch
+        
+        for batch in minibatch(dataset, bs; shuffle=shuffle, xsize=size(dataset[1])) ##########
+            
+            noise = make_noise(noise_size) ######
+            
+            #Discriminator session
+            update!(w_disc, loss(disc(gen(noise, w_gen, alpha), w_disc, alpha), 0); lr=lr, beta1=beta1, beta2=beta2, eps=eps)
+            update!(w_disc, loss(disc(batch, w_disc, alpha), 1); lr=lr, beta1=beta1, beta2=beta2, eps=eps)
+            
+            #Generator session
+            update!(w_gen, loss(disc(gen(noise, w_gen, alpha), w_disc, alpha), 0); lr=lr, beta1=beta1, beta2=beta2, eps=eps)
+            
+        end
+    
+        #Show the image generated in each epoch
+        save("/out.jpg", colorview(RGB, gen(noise)./255)) #####  
+        
+    end
+
+end   
+
+#Create necessary functions used in the training, just random for now
+make_noise(noise_size) = randn(noise_size, noise_size) #it will be an array in the future
+wgen_0(noise_size, x_size, gen_size) = xavier(noise_size, noise_size) #####
+wdisc_0(size(dataset[1]), disc_size) = xavier(noise_size, noise_size) #####
+leaky_relu(x, alpha=0.2) = max.(x*alpha, x)
+gen(noise, w_gen, alpha) = leaky_relu(deconv4(w_gen, noise), alpha) #####
+disc(x, w_disc, alpha) = leaky_relu(conv4(w_gen, noise), alpha)
+function loss(x, original)
+    if original==0
+        return log.(x) - log.(1.-x)
+    else
+        return log.(1.-x) - log.(x)
+    end
+end
+
+function main{}
+    #Create the arguments of train
+    dataset = Any[]    
+    push!(dataset, randn(3,3)); #random 1-channel data instance
+    esp = 0.001
+#    beta1 =
+#    beta2 = 
+    lr = 0.001
+    bs = 1
+    num_epoch = 1
+    alpha = 0.2
+    gen_size = 3
+    noise_size = 2
+
+    train(dataset, noise_size, gen_size, alpha, disc_size shuffle=false, bs, num_epoch, lr, beta1, beta2, eps)
+end
+
+main{}
